@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as deliverables from "../deliverables.js";
 import type * as model_deliverables from "../model/deliverables.js";
 import type * as model_derived from "../model/derived.js";
 import type * as model_programs from "../model/programs.js";
@@ -22,6 +23,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  deliverables: typeof deliverables;
   "model/deliverables": typeof model_deliverables;
   "model/derived": typeof model_derived;
   "model/programs": typeof model_programs;
