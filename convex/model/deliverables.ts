@@ -18,7 +18,8 @@ export async function deleteDeliverableCascade(
     .query("dependencies")
     .withIndex("by_consumer", (q) => q.eq("consumerDeliverableId", deliverableId))
     .collect();
-  for (const edge of [...outbound, ...inbound]) {
+  const edges = new Map([...outbound, ...inbound].map((e) => [e._id, e]));
+  for (const edge of edges.values()) {
     await ctx.db.delete(edge._id);
   }
   await ctx.db.delete(deliverableId);
