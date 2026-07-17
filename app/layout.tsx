@@ -3,6 +3,8 @@ import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import ConvexClientProvider from "@/components/ConvexClientProvider";
 import { cn } from "@/lib/utils";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
 
 const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
@@ -32,7 +34,15 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ConvexClientProvider>{children}</ConvexClientProvider>
+        <ConvexClientProvider>
+          <SidebarProvider>
+            <AppSidebar />
+            <main className="flex-1 p-6">
+              <SidebarTrigger className="mb-4" />
+              {children}
+            </main>
+          </SidebarProvider>
+        </ConvexClientProvider>
       </body>
     </html>
   );
