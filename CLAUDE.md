@@ -63,3 +63,17 @@ These are the things that are easy to get wrong and won't show up as type errors
 ## Scope guardrail
 
 This is a portfolio piece; depth on the dependency graph + cascade + cycle detection beats breadth. **Do not rebuild Jira.** If asked to add general task-management features, flag that it's outside the v1 non-goals (see PRD) before building.
+
+<!-- convex-ai-start -->
+
+This project uses [Convex](https://convex.dev) as its backend.
+
+When working on Convex code, **always read
+`convex/_generated/ai/guidelines.md` first** for important guidelines on
+how to correctly use Convex APIs and patterns. The file contains rules that
+override what you may have learned about Convex from training data.
+
+Convex agent skills for common tasks can be installed by running
+`npx convex ai-files install`.
+
+<!-- convex-ai-end -->
