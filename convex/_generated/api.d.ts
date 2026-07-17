@@ -8,13 +8,23 @@
  * @module
  */
 
+import type * as model_deliverables from "../model/deliverables.js";
+import type * as model_derived from "../model/derived.js";
+import type * as model_programs from "../model/programs.js";
+import type * as seed from "../seed.js";
+
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
 
-declare const fullApi: ApiFromModules<{}>;
+declare const fullApi: ApiFromModules<{
+  "model/deliverables": typeof model_deliverables;
+  "model/derived": typeof model_derived;
+  "model/programs": typeof model_programs;
+  seed: typeof seed;
+}>;
 
 /**
  * A utility for referencing Convex functions in your app's public API.
