@@ -11,7 +11,9 @@
 import type * as model_deliverables from "../model/deliverables.js";
 import type * as model_derived from "../model/derived.js";
 import type * as model_programs from "../model/programs.js";
+import type * as programs from "../programs.js";
 import type * as seed from "../seed.js";
+import type * as teams from "../teams.js";
 
 import type {
   ApiFromModules,
@@ -23,7 +25,9 @@ declare const fullApi: ApiFromModules<{
   "model/deliverables": typeof model_deliverables;
   "model/derived": typeof model_derived;
   "model/programs": typeof model_programs;
+  programs: typeof programs;
   seed: typeof seed;
+  teams: typeof teams;
 }>;
 
 /**
