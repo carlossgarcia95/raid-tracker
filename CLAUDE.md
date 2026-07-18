@@ -27,12 +27,12 @@ pnpm dev     # Convex backend + Next.js together, http://localhost:3000 (keep ru
 
 pnpm lint    # eslint (ignores convex/_generated)
 pnpm build   # next build — also typechecks
-# test: TODO — no test script configured yet
+pnpm test    # vitest + convex-test — unit tests for Convex functions (convex/*.test.ts)
 
 pnpm dlx shadcn@latest add <component>   # add a shadcn/ui component
 ```
 
-Use **pnpm** for everything (a `pnpm-lock.yaml` is the lockfile — don't introduce `npm`/`yarn`). Requires Node 20.9+ (Next.js 16). `pnpm dev` is `convex dev --start 'next dev'` — it runs **both** the backend and the frontend in one terminal, so don't also start `convex dev` separately. Run `pnpm lint` and `pnpm build` before reporting a task complete; add a test script here once one exists.
+Use **pnpm** for everything (a `pnpm-lock.yaml` is the lockfile — don't introduce `npm`/`yarn`). Requires Node 20.9+ (Next.js 16). `pnpm dev` is `convex dev --start 'next dev'` — it runs **both** the backend and the frontend in one terminal, so don't also start `convex dev` separately. Run `pnpm test`, `pnpm lint`, and `pnpm build` before reporting a task complete. Note: test files (`convex/*.test.ts`) are excluded from Convex's deploy typecheck in `convex/tsconfig.json` because they use Vitest-only `import.meta.glob` / `vite/client` — don't remove that exclude or the backend push breaks.
 
 ## Git
 
