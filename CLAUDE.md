@@ -36,7 +36,7 @@ Use **pnpm** for everything (a `pnpm-lock.yaml` is the lockfile — don't introd
 
 ## Git
 
-Trunk-based: `main` is always deployable. Short-lived branches (`feat/cascade-analysis`) per roadmap phase, self-reviewed PR, squash-merge. Trivial doc/config changes go straight to `main`. Tag `v0.x.0` when a roadmap phase lands.
+Trunk-based: `main` is always deployable and **local `main` stays in lockstep with `origin/main` — never accumulate un-pushed commits on it.** Short-lived branches (`feat/cascade-analysis`) per roadmap phase carry **all** the phase's work, including its spec/plan docs; self-reviewed PR; squash-merge with `--delete-branch`; then `git checkout main && git pull` to resync. Genuinely trivial doc/config one-offs may go straight to `main` **only if pushed immediately**. Tag `v0.x.0` when a roadmap phase lands.
 
 `.env.local` holds the Convex deployment name and is gitignored — never force-add it. The vendored skills in `.claude/skills/` and `.agents/skills/` are gitignored too; they're restored by `npx convex ai-files install` from `skills-lock.json`.
 
