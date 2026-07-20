@@ -16,7 +16,7 @@ import { type Preloaded, usePreloadedQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { layoutGraph } from "@/lib/graph-layout";
-import { downstreamOf, upstreamOf } from "@/lib/graph-traverse";
+import { downstreamOf } from "@/lib/graph-traverse";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DeliverableNode, type DeliverableNodeType } from "./deliverable-node";
 import { DependencyEdge, RAG_STROKE, type DependencyEdgeType } from "./dependency-edge";
@@ -33,7 +33,7 @@ type DeliverableStatus = DeliverableNodeType["data"]["status"];
 type Severity = "green" | "amber" | "red";
 
 function GraphInner({ data }: { data: GraphData }) {
-  const { fitView, setCenter, getNode } = useReactFlow();
+  const { setCenter, getNode } = useReactFlow();
   const setStatus = useMutation(api.deliverables.setStatus);
   const setRag = useMutation(api.dependencies.setRag);
 
