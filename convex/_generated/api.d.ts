@@ -15,6 +15,8 @@ import type * as graph from "../graph.js";
 import type * as issues from "../issues.js";
 import type * as model_deliverables from "../model/deliverables.js";
 import type * as model_derived from "../model/derived.js";
+import type * as model_graphAnalysis from "../model/graphAnalysis.js";
+import type * as model_graphData from "../model/graphData.js";
 import type * as model_programs from "../model/programs.js";
 import type * as programs from "../programs.js";
 import type * as risks from "../risks.js";
@@ -35,6 +37,8 @@ declare const fullApi: ApiFromModules<{
   issues: typeof issues;
   "model/deliverables": typeof model_deliverables;
   "model/derived": typeof model_derived;
+  "model/graphAnalysis": typeof model_graphAnalysis;
+  "model/graphData": typeof model_graphData;
   "model/programs": typeof model_programs;
   programs: typeof programs;
   risks: typeof risks;

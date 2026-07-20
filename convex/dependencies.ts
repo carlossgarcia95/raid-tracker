@@ -2,7 +2,7 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { slackDays } from "./model/derived";
-import { loadActiveProgramGraph } from "./model/graph-data";
+import { loadActiveProgramGraph } from "./model/graphData";
 
 const rag = v.union(v.literal("green"), v.literal("amber"), v.literal("red"));
 

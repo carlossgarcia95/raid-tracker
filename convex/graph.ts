@@ -1,11 +1,11 @@
 import { query } from "./_generated/server";
 import { slackDays } from "./model/derived";
-import { loadActiveProgramGraph } from "./model/graph-data";
+import { loadActiveProgramGraph } from "./model/graphData";
 import {
   computeCascade,
   type AnalysisEdge,
   type AnalysisNode,
-} from "./model/graph-analysis";
+} from "./model/graphAnalysis";
 
 // Deliverable graph NODES + dependency graph EDGES for the active program,
 // shaped for React Flow (source = provider, target = consumer), enriched with

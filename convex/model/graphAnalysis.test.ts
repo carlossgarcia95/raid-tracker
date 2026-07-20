@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { expect, test } from "vitest";
-import { detectCycles, type AnalysisNode, type AnalysisEdge } from "./graph-analysis";
-import { computeCascade } from "./graph-analysis";
+import { detectCycles, type AnalysisNode, type AnalysisEdge } from "./graphAnalysis";
+import { computeCascade } from "./graphAnalysis";
 
 const node = (id: string, over: Partial<AnalysisNode> = {}): AnalysisNode => ({
   id,

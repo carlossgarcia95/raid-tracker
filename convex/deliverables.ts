@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { loadActiveProgramGraph } from "./model/graph-data";
+import { loadActiveProgramGraph } from "./model/graphData";
 
 const deliverableStatus = v.union(
   v.literal("not_started"),
