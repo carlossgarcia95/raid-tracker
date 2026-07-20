@@ -16,6 +16,7 @@ export const RAG_STROKE: Record<"green" | "amber" | "red", string> = {
 
 export type DependencyEdgeData = {
   rag: "green" | "amber" | "red";
+  effectiveRag: "green" | "amber" | "red";
   isBlocking: boolean;
   slackDays: number | null;
   neededByDate: number;
@@ -47,7 +48,7 @@ export function DependencyEdge({
     targetPosition,
   });
   const d = data!;
-  const stroke = RAG_STROKE[d.rag];
+  const stroke = RAG_STROKE[d.effectiveRag];
 
   return (
     <>

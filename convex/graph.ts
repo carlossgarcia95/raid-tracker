@@ -1,72 +1,84 @@
 import { query } from "./_generated/server";
-import { getActiveProgram } from "./model/programs";
 import { slackDays } from "./model/derived";
-import { Id } from "./_generated/dataModel";
+import { loadActiveProgramGraph } from "./model/graphData";
+import {
+  computeCascade,
+  type AnalysisEdge,
+  type AnalysisNode,
+} from "./model/graphAnalysis";
 
 // Deliverable graph NODES + dependency graph EDGES for the active program,
-// shaped for React Flow (source = provider, target = consumer). Derived values
-// (slackDays, and layout positions on the client) are never stored.
+// shaped for React Flow (source = provider, target = consumer), enriched with
+// cascade-adjusted RAG + reasons and the program's dependency cycles. Every
+// derived value is computed here and never persisted (ADR-0006).
 export const get = query({
   args: {},
   handler: async (ctx) => {
-    const program = await getActiveProgram(ctx);
-    if (!program) return { nodes: [], edges: [] };
+    const graph = await loadActiveProgramGraph(ctx);
+    if (!graph) return { nodes: [], edges: [], cycles: [] };
+    const { teamById, deliverableById, edges: inProgramEdges } = graph;
 
-    const teams = await ctx.db.query("teams").take(500);
-    const teamById = new Map(teams.map((t) => [t._id, t]));
+    const deliverables = [...deliverableById.values()];
 
-    const deliverables = await ctx.db
-      .query("deliverables")
-      .withIndex("by_program", (q) => q.eq("programId", program._id))
-      .take(500);
-    const deliverableById = new Map(deliverables.map((d) => [d._id, d]));
+    // Only edges whose BOTH endpoints render — a dangling endpoint makes
+    // React Flow throw (stricter than dependencies.list, which needs only the
+    // provider in-program).
+    const renderEdges = inProgramEdges.filter((e) =>
+      deliverableById.has(e.consumerDeliverableId),
+    );
+
+    const analysisNodes: AnalysisNode[] = deliverables.map((d) => ({
+      id: d._id,
+      title: d.title,
+      status: d.status,
+      targetDate: d.targetDate,
+    }));
+    const analysisEdges: AnalysisEdge[] = renderEdges.map((e) => ({
+      id: e._id,
+      source: e.providerDeliverableId,
+      target: e.consumerDeliverableId,
+      rag: e.rag,
+      isBlocking: e.isBlocking,
+      slackDays: slackDays(e.neededByDate, e.committedDate),
+    }));
+
+    const { nodeStates, edgeStates, cycles } = computeCascade(
+      analysisNodes,
+      analysisEdges,
+      Date.now(),
+    );
 
     const nodes = deliverables.map((d) => {
       const team = teamById.get(d.owningTeamId);
+      const state = nodeStates[d._id];
       return {
         id: d._id,
         title: d.title,
         status: d.status,
         teamName: team?.name ?? "—",
         teamColor: team?.color ?? "#94a3b8",
+        effectiveRag: state?.effectiveRag ?? "green",
+        reasons: state?.reasons ?? [],
       };
     });
 
-    const nameFor = (id: Id<"deliverables">) => {
-      const d = deliverableById.get(id);
-      const team = d ? teamById.get(d.owningTeamId) : undefined;
-      return { title: d?.title ?? "—", teamName: team?.name ?? "—" };
-    };
+    const edges = renderEdges.map((e) => {
+      const state = edgeStates[e._id];
+      return {
+        id: e._id,
+        source: e.providerDeliverableId,
+        target: e.consumerDeliverableId,
+        rag: e.rag,
+        effectiveRag: state?.effectiveRag ?? e.rag,
+        reasons: state?.reasons ?? [],
+        isBlocking: e.isBlocking,
+        neededByDate: e.neededByDate,
+        committedDate: e.committedDate,
+        slackDays: slackDays(e.neededByDate, e.committedDate),
+        description: e.description,
+      };
+    });
 
-    const allEdges = await ctx.db.query("dependencies").take(1000);
-    const edges = allEdges
-      // Keep only edges whose BOTH endpoints are nodes we render — a dangling
-      // endpoint would make React Flow throw.
-      .filter(
-        (e) =>
-          deliverableById.has(e.providerDeliverableId) &&
-          deliverableById.has(e.consumerDeliverableId),
-      )
-      .map((e) => {
-        const p = nameFor(e.providerDeliverableId);
-        const c = nameFor(e.consumerDeliverableId);
-        return {
-          id: e._id,
-          source: e.providerDeliverableId,
-          target: e.consumerDeliverableId,
-          rag: e.rag,
-          isBlocking: e.isBlocking,
-          neededByDate: e.neededByDate,
-          committedDate: e.committedDate,
-          slackDays: slackDays(e.neededByDate, e.committedDate),
-          description: e.description,
-          providerTitle: p.title,
-          providerTeamName: p.teamName,
-          consumerTitle: c.title,
-          consumerTeamName: c.teamName,
-        };
-      });
-
-    return { nodes, edges };
+    return { nodes, edges, cycles };
   },
 });

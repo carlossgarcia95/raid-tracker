@@ -1,25 +1,17 @@
-import { query } from "./_generated/server";
-import { getActiveProgram } from "./model/programs";
-import { slackDays } from "./model/derived";
+import { mutation, query } from "./_generated/server";
+import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
+import { slackDays } from "./model/derived";
+import { loadActiveProgramGraph } from "./model/graphData";
+
+const rag = v.union(v.literal("green"), v.literal("amber"), v.literal("red"));
 
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    const program = await getActiveProgram(ctx);
-    if (!program) return [];
-
-    const teams = await ctx.db.query("teams").take(500);
-    const teamById = new Map(teams.map((t) => [t._id, t]));
-
-    const deliverables = await ctx.db
-      .query("deliverables")
-      .withIndex("by_program", (q) => q.eq("programId", program._id))
-      .take(500);
-    const deliverableById = new Map(deliverables.map((d) => [d._id, d]));
-
-    const edges = await ctx.db.query("dependencies").take(500);
-    const inProgram = edges.filter((e) => deliverableById.has(e.providerDeliverableId));
+    const graph = await loadActiveProgramGraph(ctx);
+    if (!graph) return [];
+    const { teamById, deliverableById, edges } = graph;
 
     const teamName = (deliverableId: Id<"deliverables">) => {
       const d = deliverableById.get(deliverableId);
@@ -29,7 +21,7 @@ export const list = query({
     const title = (deliverableId: Id<"deliverables">) =>
       deliverableById.get(deliverableId)?.title ?? "—";
 
-    return inProgram.map((e) => ({
+    return edges.map((e) => ({
       _id: e._id,
       _creationTime: e._creationTime,
       description: e.description,
@@ -43,5 +35,24 @@ export const list = query({
       consumerTitle: title(e.consumerDeliverableId),
       consumerTeamName: teamName(e.consumerDeliverableId),
     }));
+  },
+});
+
+export const setRag = mutation({
+  args: { id: v.id("dependencies"), rag },
+  handler: async (ctx, { id, rag: next }) => {
+    const doc = await ctx.db.get(id);
+    if (!doc) throw new Error("Dependency not found");
+    if (doc.rag === next) return null;
+
+    await ctx.db.patch(id, { rag: next });
+    await ctx.db.insert("statusChanges", {
+      entityType: "dependency",
+      entityId: id,
+      field: "rag",
+      oldValue: doc.rag,
+      newValue: next,
+    });
+    return null;
   },
 });
