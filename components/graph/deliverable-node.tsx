@@ -8,6 +8,8 @@ export type DeliverableNodeData = {
   status: "not_started" | "in_progress" | "blocked" | "done";
   teamName: string;
   teamColor: string;
+  effectiveRag: "green" | "amber" | "red";
+  inCycle: boolean;
   dimmed: boolean;
 };
 export type DeliverableNodeType = Node<DeliverableNodeData, "deliverable">;
@@ -22,12 +24,18 @@ const STATUS_LABEL: Record<DeliverableNodeData["status"], string> = {
 export const DeliverableNode = memo(function DeliverableNode({
   data,
 }: NodeProps<DeliverableNodeType>) {
-  const blocked = data.status === "blocked";
+  const ringByRag: Record<DeliverableNodeData["effectiveRag"], string> = {
+    green: "",
+    amber: "ring-2 ring-amber-500",
+    red: "ring-2 ring-red-500",
+  };
   return (
     <div
       className={cn(
         "rounded-md border bg-background px-3 py-2 shadow-sm transition-opacity",
-        blocked && "ring-2 ring-red-500",
+        ringByRag[data.effectiveRag],
+        data.inCycle &&
+          "outline outline-2 outline-dashed outline-purple-500 outline-offset-2",
         data.dimmed && "opacity-25",
       )}
       style={{ width: NODE_WIDTH, borderLeft: `4px solid ${data.teamColor}` }}
