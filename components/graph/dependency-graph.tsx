@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Background,
   Controls,
@@ -19,6 +19,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { DeliverableNode, type DeliverableNodeType } from "./deliverable-node";
 import { DependencyEdge, RAG_STROKE, type DependencyEdgeType } from "./dependency-edge";
 import { GraphLegend } from "./graph-legend";
+import { NodeInspectorPanel } from "./node-inspector-panel";
 
 const nodeTypes: NodeTypes = { deliverable: DeliverableNode };
 const edgeTypes: EdgeTypes = { dependency: DependencyEdge };
@@ -29,6 +30,69 @@ export function DependencyGraph({
   preloaded: Preloaded<typeof api.graph.get>;
 }) {
   const data = usePreloadedQuery(preloaded);
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const nodeById = useMemo(
+    () => new Map(data.nodes.map((n) => [n.id, n])),
+    [data.nodes],
+  );
+  type NodeId = (typeof data.nodes)[number]["id"];
+
+  // Direct neighbors only (one hop) — transitive traversal is Phase 3.
+  const neighborIds = useMemo(() => {
+    const s = new Set<string>();
+    if (!selectedId) return s;
+    for (const e of data.edges) {
+      if (e.source === selectedId) s.add(e.target);
+      if (e.target === selectedId) s.add(e.source);
+    }
+    return s;
+  }, [selectedId, data.edges]);
+
+  const upstream = useMemo(
+    () =>
+      selectedId
+        ? data.edges
+            .filter((e) => e.target === selectedId)
+            .map((e) => {
+              const o = nodeById.get(e.source)!;
+              return {
+                id: o.id,
+                title: o.title,
+                teamName: o.teamName,
+                rag: e.rag,
+                neededByDate: e.neededByDate,
+                slackDays: e.slackDays,
+              };
+            })
+        : [],
+    [selectedId, data.edges, nodeById],
+  );
+
+  const downstream = useMemo(
+    () =>
+      selectedId
+        ? data.edges
+            .filter((e) => e.source === selectedId)
+            .map((e) => {
+              const o = nodeById.get(e.target)!;
+              return {
+                id: o.id,
+                title: o.title,
+                teamName: o.teamName,
+                rag: e.rag,
+                neededByDate: e.neededByDate,
+                slackDays: e.slackDays,
+              };
+            })
+        : [],
+    [selectedId, data.edges, nodeById],
+  );
+
+  const selectedNode = selectedId
+    ? nodeById.get(selectedId as NodeId) ?? null
+    : null;
 
   const positions = useMemo(
     () =>
@@ -53,11 +117,12 @@ export function DependencyGraph({
           status: n.status,
           teamName: n.teamName,
           teamColor: n.teamColor,
-          dimmed: false,
+          dimmed:
+            selectedId !== null && n.id !== selectedId && !neighborIds.has(n.id),
         },
       })),
     );
-  }, [data.nodes, positions, setNodes]);
+  }, [data.nodes, positions, setNodes, selectedId, neighborIds]);
 
   useEffect(() => {
     setEdges(
@@ -74,11 +139,14 @@ export function DependencyGraph({
           neededByDate: e.neededByDate,
           committedDate: e.committedDate,
           description: e.description,
-          dimmed: false,
+          dimmed:
+            selectedId !== null &&
+            e.source !== selectedId &&
+            e.target !== selectedId,
         },
       })),
     );
-  }, [data.edges, setEdges]);
+  }, [data.edges, setEdges, selectedId]);
 
   if (data.nodes.length === 0) {
     return (
@@ -103,11 +171,22 @@ export function DependencyGraph({
           fitView
           colorMode="system"
           proOptions={{ hideAttribution: true }}
+          onNodeClick={(_, n) => setSelectedId(n.id)}
+          onPaneClick={() => setSelectedId(null)}
         >
           <Background />
           <Controls showInteractive={false} />
           <GraphLegend />
         </ReactFlow>
+        {selectedNode && (
+          <NodeInspectorPanel
+            node={selectedNode}
+            upstream={upstream}
+            downstream={downstream}
+            onSelect={setSelectedId}
+            onClose={() => setSelectedId(null)}
+          />
+        )}
       </div>
     </TooltipProvider>
   );
