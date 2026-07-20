@@ -9,6 +9,7 @@
  */
 
 import type * as assumptions from "../assumptions.js";
+import type * as dashboard from "../dashboard.js";
 import type * as deliverables from "../deliverables.js";
 import type * as dependencies from "../dependencies.js";
 import type * as graph from "../graph.js";
@@ -32,6 +33,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   assumptions: typeof assumptions;
+  dashboard: typeof dashboard;
   deliverables: typeof deliverables;
   dependencies: typeof dependencies;
   graph: typeof graph;
