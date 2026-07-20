@@ -18,6 +18,7 @@ import type * as model_derived from "../model/derived.js";
 import type * as model_graphAnalysis from "../model/graphAnalysis.js";
 import type * as model_graphData from "../model/graphData.js";
 import type * as model_programs from "../model/programs.js";
+import type * as model_rollups from "../model/rollups.js";
 import type * as programs from "../programs.js";
 import type * as risks from "../risks.js";
 import type * as seed from "../seed.js";
@@ -40,6 +41,7 @@ declare const fullApi: ApiFromModules<{
   "model/graphAnalysis": typeof model_graphAnalysis;
   "model/graphData": typeof model_graphData;
   "model/programs": typeof model_programs;
+  "model/rollups": typeof model_rollups;
   programs: typeof programs;
   risks: typeof risks;
   seed: typeof seed;
