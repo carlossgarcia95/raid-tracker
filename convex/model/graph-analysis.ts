@@ -92,3 +92,112 @@ export function detectCycles(
 
 // Helpers exported for computeCascade (Task 2) in the same file.
 export const _sev = { RANK, maxSev, soften };
+
+export type ItemState = { effectiveRag: Severity; reasons: string[] };
+
+export type CascadeResult = {
+  nodeStates: Record<string, ItemState>;
+  edgeStates: Record<string, ItemState>;
+  cycles: Cycle[];
+};
+
+const uniq = (xs: string[]): string[] => [...new Set(xs)];
+
+export function computeCascade(
+  nodes: AnalysisNode[],
+  edges: AnalysisEdge[],
+  now: number,
+): CascadeResult {
+  const { RANK, maxSev, soften } = _sev;
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+  const cycles = detectCycles(nodes, edges);
+  const cycleMembers = new Set(cycles.flatMap((c) => c.deliverableIds));
+
+  // Intrinsic (self) severities.
+  const nodeIntrinsic = new Map<string, Severity>();
+  const nodeReasons = new Map<string, string[]>();
+  for (const n of nodes) {
+    let sev: Severity = "green";
+    const reasons: string[] = [];
+    if (n.status === "blocked") {
+      sev = "red";
+      reasons.push("blocked");
+    }
+    if (cycleMembers.has(n.id)) {
+      sev = "red";
+      reasons.push("cycle member");
+    }
+    if (n.status !== "done" && n.targetDate !== undefined && n.targetDate < now) {
+      sev = maxSev(sev, "amber");
+      reasons.push("overdue");
+    }
+    nodeIntrinsic.set(n.id, sev);
+    nodeReasons.set(n.id, reasons);
+  }
+
+  const edgeIntrinsic = new Map<string, Severity>();
+  const edgeReasons = new Map<string, string[]>();
+  for (const e of edges) {
+    let sev: Severity = "green";
+    const reasons: string[] = [];
+    if (e.rag === "red") {
+      sev = "red";
+      reasons.push("manually red");
+    }
+    if (e.slackDays !== null && e.slackDays < 0) {
+      sev = maxSev(sev, "amber");
+      reasons.push(`negative slack (${e.slackDays}d)`);
+    }
+    edgeIntrinsic.set(e.id, sev);
+    edgeReasons.set(e.id, reasons);
+  }
+
+  // Fixpoint over node severities. Severities only rise and are capped at red,
+  // so this terminates even when the graph has cycles.
+  const nodeSev = new Map(nodeIntrinsic);
+  const transmitted = (e: AnalysisEdge): Severity => {
+    const carried = maxSev(nodeSev.get(e.source) ?? "green", edgeIntrinsic.get(e.id)!);
+    return e.isBlocking ? carried : soften(carried);
+  };
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const e of edges) {
+      const t = transmitted(e);
+      const cur = nodeSev.get(e.target) ?? "green";
+      if (RANK[t] > RANK[cur]) {
+        nodeSev.set(e.target, t);
+        changed = true;
+      }
+    }
+  }
+
+  const incoming = new Map<string, AnalysisEdge[]>();
+  for (const n of nodes) incoming.set(n.id, []);
+  for (const e of edges) incoming.get(e.target)?.push(e);
+
+  const nodeStates: Record<string, ItemState> = {};
+  for (const n of nodes) {
+    const reasons = [...(nodeReasons.get(n.id) ?? [])];
+    for (const e of incoming.get(n.id) ?? []) {
+      if (RANK[transmitted(e)] > 0) {
+        reasons.push(`depends on at-risk: ${nodeById.get(e.source)?.title ?? e.source}`);
+      }
+    }
+    nodeStates[n.id] = { effectiveRag: nodeSev.get(n.id)!, reasons: uniq(reasons) };
+  }
+
+  const edgeStates: Record<string, ItemState> = {};
+  for (const e of edges) {
+    const providerSev = nodeSev.get(e.source) ?? "green";
+    const softenedProvider = e.isBlocking ? providerSev : soften(providerSev);
+    const effectiveRag = maxSev(edgeIntrinsic.get(e.id)!, softenedProvider);
+    const reasons = [...(edgeReasons.get(e.id) ?? [])];
+    if (RANK[providerSev] > 0) {
+      reasons.push(`provider at risk: ${nodeById.get(e.source)?.title ?? e.source}`);
+    }
+    edgeStates[e.id] = { effectiveRag, reasons: uniq(reasons) };
+  }
+
+  return { nodeStates, edgeStates, cycles };
+}
