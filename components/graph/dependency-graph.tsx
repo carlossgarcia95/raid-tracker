@@ -67,15 +67,10 @@ function GraphInner({ data }: { data: GraphData }) {
   }, [selectedId, data.edges]);
 
   // Transitive downstream impact count for the inspector header.
-  const impactCount = useMemo(() => {
-    if (!selectedId) return 0;
-    const down = downstreamOf(selectedId, data.edges);
-    let n = 0;
-    for (const id of down) {
-      if (nodeById.get(id)?.effectiveRag !== "green") n++;
-    }
-    return n;
-  }, [selectedId, data.edges, nodeById]);
+  const impactCount = useMemo(
+    () => (selectedId ? downstreamOf(selectedId, data.edges).size : 0),
+    [selectedId, data.edges],
+  );
 
   const toRow = useCallback(
     (edgeId: string, otherId: string, e: GraphData["edges"][number]) => {
