@@ -1,45 +1,61 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Background,
   Controls,
   MarkerType,
   ReactFlow,
-  useEdgesState,
-  useNodesState,
+  ReactFlowProvider,
+  useReactFlow,
   type EdgeTypes,
   type NodeTypes,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { type Preloaded, usePreloadedQuery } from "convex/react";
+import { type Preloaded, usePreloadedQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { layoutGraph } from "@/lib/graph-layout";
+import { downstreamOf, upstreamOf } from "@/lib/graph-traverse";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DeliverableNode, type DeliverableNodeType } from "./deliverable-node";
 import { DependencyEdge, RAG_STROKE, type DependencyEdgeType } from "./dependency-edge";
 import { GraphLegend } from "./graph-legend";
+import { CycleBanner } from "./cycle-banner";
 import { NodeInspectorPanel } from "./node-inspector-panel";
+import { useNodesState, useEdgesState } from "@xyflow/react";
 
 const nodeTypes: NodeTypes = { deliverable: DeliverableNode };
 const edgeTypes: EdgeTypes = { dependency: DependencyEdge };
 
-export function DependencyGraph({
-  preloaded,
-}: {
-  preloaded: Preloaded<typeof api.graph.get>;
-}) {
-  const data = usePreloadedQuery(preloaded);
+type GraphData = ReturnType<typeof usePreloadedQuery<typeof api.graph.get>>;
+type DeliverableStatus = DeliverableNodeType["data"]["status"];
+type Severity = "green" | "amber" | "red";
+
+function GraphInner({ data }: { data: GraphData }) {
+  const { fitView, setCenter, getNode } = useReactFlow();
+  const setStatus = useMutation(api.deliverables.setStatus);
+  const setRag = useMutation(api.dependencies.setRag);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const nodeById = useMemo(
-    () => new Map(data.nodes.map((n) => [n.id, n])),
+    () =>
+      new Map<string, GraphData["nodes"][number]>(
+        data.nodes.map((n) => [n.id, n]),
+      ),
     [data.nodes],
   );
-  type NodeId = (typeof data.nodes)[number]["id"];
+  const nodeTitleById = useMemo(
+    () => new Map(data.nodes.map((n) => [n.id, n.title] as const)),
+    [data.nodes],
+  );
+  const cycleMembers = useMemo(
+    () => new Set(data.cycles.flatMap((c) => c.deliverableIds)),
+    [data.cycles],
+  );
 
-  // Direct neighbors only (one hop) — transitive traversal is Phase 3.
+  // Direct-neighbor highlight (one hop).
   const neighborIds = useMemo(() => {
     const s = new Set<string>();
     if (!selectedId) return s;
@@ -50,49 +66,55 @@ export function DependencyGraph({
     return s;
   }, [selectedId, data.edges]);
 
-  const upstream = useMemo(
+  // Transitive downstream impact count for the inspector header.
+  const impactCount = useMemo(() => {
+    if (!selectedId) return 0;
+    const down = downstreamOf(selectedId, data.edges);
+    let n = 0;
+    for (const id of down) {
+      if (nodeById.get(id)?.effectiveRag !== "green") n++;
+    }
+    return n;
+  }, [selectedId, data.edges, nodeById]);
+
+  const toRow = useCallback(
+    (edgeId: string, otherId: string, e: GraphData["edges"][number]) => {
+      const o = nodeById.get(otherId)!;
+      return {
+        edgeId,
+        id: o.id,
+        title: o.title,
+        teamName: o.teamName,
+        effectiveRag: e.effectiveRag as Severity,
+        rag: e.rag as Severity,
+        reason: e.reasons[0],
+        neededByDate: e.neededByDate,
+        slackDays: e.slackDays,
+      };
+    },
+    [nodeById],
+  );
+
+  const directUpstream = useMemo(
     () =>
       selectedId
         ? data.edges
             .filter((e) => e.target === selectedId)
-            .map((e) => {
-              const o = nodeById.get(e.source)!;
-              return {
-                id: o.id,
-                title: o.title,
-                teamName: o.teamName,
-                rag: e.rag,
-                neededByDate: e.neededByDate,
-                slackDays: e.slackDays,
-              };
-            })
+            .map((e) => toRow(e.id, e.source, e))
         : [],
-    [selectedId, data.edges, nodeById],
+    [selectedId, data.edges, toRow],
   );
-
-  const downstream = useMemo(
+  const directDownstream = useMemo(
     () =>
       selectedId
         ? data.edges
             .filter((e) => e.source === selectedId)
-            .map((e) => {
-              const o = nodeById.get(e.target)!;
-              return {
-                id: o.id,
-                title: o.title,
-                teamName: o.teamName,
-                rag: e.rag,
-                neededByDate: e.neededByDate,
-                slackDays: e.slackDays,
-              };
-            })
+            .map((e) => toRow(e.id, e.target, e))
         : [],
-    [selectedId, data.edges, nodeById],
+    [selectedId, data.edges, toRow],
   );
 
-  const selectedNode = selectedId
-    ? nodeById.get(selectedId as NodeId) ?? null
-    : null;
+  const selectedNode = selectedId ? nodeById.get(selectedId) ?? null : null;
 
   const positions = useMemo(
     () =>
@@ -117,12 +139,14 @@ export function DependencyGraph({
           status: n.status,
           teamName: n.teamName,
           teamColor: n.teamColor,
+          effectiveRag: n.effectiveRag,
+          inCycle: cycleMembers.has(n.id),
           dimmed:
             selectedId !== null && n.id !== selectedId && !neighborIds.has(n.id),
         },
       })),
     );
-  }, [data.nodes, positions, setNodes, selectedId, neighborIds]);
+  }, [data.nodes, positions, setNodes, selectedId, neighborIds, cycleMembers]);
 
   useEffect(() => {
     setEdges(
@@ -131,9 +155,10 @@ export function DependencyGraph({
         source: e.source,
         target: e.target,
         type: "dependency",
-        markerEnd: { type: MarkerType.ArrowClosed, color: RAG_STROKE[e.rag] },
+        markerEnd: { type: MarkerType.ArrowClosed, color: RAG_STROKE[e.effectiveRag] },
         data: {
           rag: e.rag,
+          effectiveRag: e.effectiveRag,
           isBlocking: e.isBlocking,
           slackDays: e.slackDays,
           neededByDate: e.neededByDate,
@@ -148,17 +173,21 @@ export function DependencyGraph({
     );
   }, [data.edges, setEdges, selectedId]);
 
-  if (data.nodes.length === 0) {
-    return (
-      <div className="flex h-[calc(100vh-9rem)] items-center justify-center rounded-md border text-sm text-muted-foreground">
-        No deliverables in the active program yet.
-      </div>
-    );
-  }
+  const focusCycle = useCallback(
+    (ids: string[]) => {
+      const pts = ids.map((id) => getNode(id)).filter((n): n is NonNullable<typeof n> => !!n);
+      if (pts.length === 0) return;
+      const cx = pts.reduce((s, n) => s + n.position.x, 0) / pts.length;
+      const cy = pts.reduce((s, n) => s + n.position.y, 0) / pts.length;
+      setCenter(cx, cy, { zoom: 1.2, duration: 600 });
+    },
+    [getNode, setCenter],
+  );
 
   return (
-    <TooltipProvider delay={0}>
-      <div className="relative h-[calc(100vh-9rem)] w-full rounded-md border">
+    <>
+      <CycleBanner cycles={data.cycles} nodeTitleById={nodeTitleById} onFocus={focusCycle} />
+      <div className="relative h-[calc(100vh-12rem)] w-full rounded-md border">
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -181,12 +210,45 @@ export function DependencyGraph({
         {selectedNode && (
           <NodeInspectorPanel
             node={selectedNode}
-            upstream={upstream}
-            downstream={downstream}
+            directUpstream={directUpstream}
+            directDownstream={directDownstream}
+            impactCount={impactCount}
             onSelect={setSelectedId}
+            onSetStatus={(status: DeliverableStatus) =>
+              setStatus({ id: selectedNode.id as Id<"deliverables">, status })
+            }
+            onSetRag={(edgeId, rag) =>
+              setRag({ id: edgeId as Id<"dependencies">, rag })
+            }
             onClose={() => setSelectedId(null)}
           />
         )}
+      </div>
+    </>
+  );
+}
+
+export function DependencyGraph({
+  preloaded,
+}: {
+  preloaded: Preloaded<typeof api.graph.get>;
+}) {
+  const data = usePreloadedQuery(preloaded);
+
+  if (data.nodes.length === 0) {
+    return (
+      <div className="flex h-[calc(100vh-12rem)] items-center justify-center rounded-md border text-sm text-muted-foreground">
+        No deliverables in the active program yet.
+      </div>
+    );
+  }
+
+  return (
+    <TooltipProvider delay={0}>
+      <div className="space-y-3">
+        <ReactFlowProvider>
+          <GraphInner data={data} />
+        </ReactFlowProvider>
       </div>
     </TooltipProvider>
   );
