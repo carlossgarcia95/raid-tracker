@@ -11,6 +11,7 @@
 import type * as assumptions from "../assumptions.js";
 import type * as deliverables from "../deliverables.js";
 import type * as dependencies from "../dependencies.js";
+import type * as graph from "../graph.js";
 import type * as issues from "../issues.js";
 import type * as model_deliverables from "../model/deliverables.js";
 import type * as model_derived from "../model/derived.js";
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   assumptions: typeof assumptions;
   deliverables: typeof deliverables;
   dependencies: typeof dependencies;
+  graph: typeof graph;
   issues: typeof issues;
   "model/deliverables": typeof model_deliverables;
   "model/derived": typeof model_derived;
