@@ -9,7 +9,7 @@ const modules = import.meta.glob("./**/*.ts");
 test("graph.get returns program nodes and edges wired provider->consumer", async () => {
   const t = convexTest(schema, modules);
   await t.mutation(internal.seed.run, {});
-  const { nodes, edges } = await t.query(api.graph.get, {});
+  const { nodes, edges, cycles } = await t.query(api.graph.get, {});
 
   // Seed has 9 deliverables and 8 dependencies, all in one program.
   expect(nodes.length).toBe(9);
@@ -33,8 +33,40 @@ test("graph.get returns program nodes and edges wired provider->consumer", async
   expect(auth.teamColor).toBe("#6366f1");
 
   // Edge with no committed date -> null slack (Analytics -> Reporting).
-  const softEdge = edges.find((e) => e.consumerTitle === "Reporting Service");
+  const analytics = nodes.find((n) => n.title === "Analytics Dashboard")!;
+  const reporting = nodes.find((n) => n.title === "Reporting Service")!;
+  const softEdge = edges.find(
+    (e) => e.source === analytics.id && e.target === reporting.id,
+  );
   expect(softEdge?.slackDays).toBeNull();
+
+  // Cascade: Checkout API is blocked -> it and everything downstream is red.
+  const iap = nodes.find((n) => n.title === "In-App Purchase")!;
+  const appStore = nodes.find((n) => n.title === "App Store Release")!;
+  expect(checkout.effectiveRag).toBe("red");
+  expect(checkout.reasons).toContain("blocked");
+  expect(iap.effectiveRag).toBe("red");
+  expect(appStore.effectiveRag).toBe("red"); // green edge, but blocked upstream
+  expect(appStore.reasons).toContain("depends on at-risk: In-App Purchase");
+
+  // Auth Service is upstream of the blockage, so it stays green.
+  expect(auth.effectiveRag).toBe("green");
+
+  // The green IAP -> App Store Release edge displays red via cascade.
+  const releaseEdge = edges.find((e) => e.source === iap.id && e.target === appStore.id);
+  expect(releaseEdge?.rag).toBe("green"); // manual baseline preserved
+  expect(releaseEdge?.effectiveRag).toBe("red"); // cascade-adjusted
+
+  // Cycle detection: the planted Data cycle is reported.
+  expect(cycles.length).toBe(1);
+  const cycleTitles = new Set(
+    cycles[0].deliverableIds.map((id) => nodes.find((n) => n.id === id)?.title),
+  );
+  expect(cycleTitles.has("Data Pipeline")).toBe(true);
+  expect(cycleTitles.has("Reporting Service")).toBe(true);
+  const pipeline = nodes.find((n) => n.title === "Data Pipeline")!;
+  expect(pipeline.effectiveRag).toBe("red");
+  expect(pipeline.reasons).toContain("cycle member");
 });
 
 test("graph.get excludes deliverables and edges from a non-active program", async () => {
