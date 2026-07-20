@@ -1,7 +1,10 @@
-import { query } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
+import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { slackDays } from "./model/derived";
 import { loadActiveProgramGraph } from "./model/graph-data";
+
+const rag = v.union(v.literal("green"), v.literal("amber"), v.literal("red"));
 
 export const list = query({
   args: {},
@@ -32,5 +35,24 @@ export const list = query({
       consumerTitle: title(e.consumerDeliverableId),
       consumerTeamName: teamName(e.consumerDeliverableId),
     }));
+  },
+});
+
+export const setRag = mutation({
+  args: { id: v.id("dependencies"), rag },
+  handler: async (ctx, { id, rag: next }) => {
+    const doc = await ctx.db.get(id);
+    if (!doc) throw new Error("Dependency not found");
+    if (doc.rag === next) return null;
+
+    await ctx.db.patch(id, { rag: next });
+    await ctx.db.insert("statusChanges", {
+      entityType: "dependency",
+      entityId: id,
+      field: "rag",
+      oldValue: doc.rag,
+      newValue: next,
+    });
+    return null;
   },
 });

@@ -23,3 +23,27 @@ test("dependencies.list joins titles and computes slackDays", async () => {
   const softEdge = rows.find((r) => r.consumerTitle === "Reporting Service");
   expect(softEdge?.slackDays).toBeNull(); // no committed date on that edge
 });
+
+test("setRag updates the edge and logs the change", async () => {
+  const t = convexTest(schema, modules);
+  await t.mutation(internal.seed.run, {});
+  const before = await t.query(api.dependencies.list, {});
+  const target = before.find((e) => e.rag === "green")!;
+
+  await t.mutation(api.dependencies.setRag, { id: target._id, rag: "red" });
+
+  const after = await t.query(api.dependencies.list, {});
+  expect(after.find((e) => e._id === target._id)!.rag).toBe("red");
+
+  const logs = await t.run(async (ctx) =>
+    ctx.db
+      .query("statusChanges")
+      .withIndex("by_entity", (q) =>
+        q.eq("entityType", "dependency").eq("entityId", target._id),
+      )
+      .collect(),
+  );
+  expect(logs).toHaveLength(1);
+  expect(logs[0].field).toBe("rag");
+  expect(logs[0].newValue).toBe("red");
+});
