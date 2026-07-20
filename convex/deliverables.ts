@@ -1,21 +1,14 @@
 import { query } from "./_generated/server";
-import { getActiveProgram } from "./model/programs";
+import { loadActiveProgramGraph } from "./model/graph-data";
 
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    const program = await getActiveProgram(ctx);
-    if (!program) return [];
+    const graph = await loadActiveProgramGraph(ctx);
+    if (!graph) return [];
+    const { teamById, deliverableById } = graph;
 
-    const teams = await ctx.db.query("teams").take(500);
-    const teamById = new Map(teams.map((t) => [t._id, t]));
-
-    const deliverables = await ctx.db
-      .query("deliverables")
-      .withIndex("by_program", (q) => q.eq("programId", program._id))
-      .take(500);
-
-    return deliverables.map((d) => {
+    return [...deliverableById.values()].map((d) => {
       const team = teamById.get(d.owningTeamId);
       return {
         _id: d._id,
