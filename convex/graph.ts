@@ -1,11 +1,7 @@
 import { query } from "./_generated/server";
 import { slackDays } from "./model/derived";
-import { loadActiveProgramGraph } from "./model/graphData";
-import {
-  computeCascade,
-  type AnalysisEdge,
-  type AnalysisNode,
-} from "./model/graphAnalysis";
+import { loadActiveProgramGraph, toAnalysisGraph } from "./model/graphData";
+import { computeCascade } from "./model/graphAnalysis";
 
 // Deliverable graph NODES + dependency graph EDGES for the active program,
 // shaped for React Flow (source = provider, target = consumer), enriched with
@@ -19,28 +15,10 @@ export const get = query({
     const { teamById, deliverableById, edges: inProgramEdges } = graph;
 
     const deliverables = [...deliverableById.values()];
-
-    // Only edges whose BOTH endpoints render — a dangling endpoint makes
-    // React Flow throw (stricter than dependencies.list, which needs only the
-    // provider in-program).
-    const renderEdges = inProgramEdges.filter((e) =>
-      deliverableById.has(e.consumerDeliverableId),
+    const { analysisNodes, analysisEdges, renderEdges } = toAnalysisGraph(
+      deliverableById,
+      inProgramEdges,
     );
-
-    const analysisNodes: AnalysisNode[] = deliverables.map((d) => ({
-      id: d._id,
-      title: d.title,
-      status: d.status,
-      targetDate: d.targetDate,
-    }));
-    const analysisEdges: AnalysisEdge[] = renderEdges.map((e) => ({
-      id: e._id,
-      source: e.providerDeliverableId,
-      target: e.consumerDeliverableId,
-      rag: e.rag,
-      isBlocking: e.isBlocking,
-      slackDays: slackDays(e.neededByDate, e.committedDate),
-    }));
 
     const { nodeStates, edgeStates, cycles } = computeCascade(
       analysisNodes,

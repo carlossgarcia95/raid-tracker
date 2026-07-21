@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { expect, test } from "vitest";
 import { detectCycles, type AnalysisNode, type AnalysisEdge } from "./graphAnalysis";
-import { computeCascade } from "./graphAnalysis";
+import { computeCascade, downstreamReach } from "./graphAnalysis";
 
 const node = (id: string, over: Partial<AnalysisNode> = {}): AnalysisNode => ({
   id,
@@ -118,4 +118,38 @@ test("computeCascade shows a green edge as red when its provider is blocked", ()
   const { edgeStates } = computeCascade(nodes, edges, 0);
   expect(edgeStates["e1"].effectiveRag).toBe("red");
   expect(edgeStates["e1"].reasons).toContain("provider at risk: a");
+});
+
+test("downstreamReach counts distinct downstream nodes over blocking edges", () => {
+  const nodes = [node("a"), node("b"), node("c")];
+  const edges = [edge("e1", "a", "b"), edge("e2", "b", "c")];
+  expect(downstreamReach(nodes, edges)).toEqual({ a: 2, b: 1, c: 0 });
+});
+
+test("downstreamReach ignores non-blocking edges", () => {
+  const nodes = [node("a"), node("b"), node("c")];
+  const edges = [
+    edge("e1", "a", "b", { isBlocking: false }),
+    edge("e2", "b", "c"),
+  ];
+  // a reaches nothing (its only out-edge is soft); b still reaches c.
+  expect(downstreamReach(nodes, edges)).toEqual({ a: 0, b: 1, c: 0 });
+});
+
+test("downstreamReach counts a fan-out target once", () => {
+  const nodes = [node("a"), node("b"), node("c"), node("d")];
+  const edges = [
+    edge("e1", "a", "b"),
+    edge("e2", "a", "c"),
+    edge("e3", "b", "d"),
+    edge("e4", "c", "d"),
+  ];
+  expect(downstreamReach(nodes, edges)["a"]).toBe(3); // b, c, d — d once
+});
+
+test("downstreamReach terminates on a cycle and excludes self", () => {
+  const nodes = [node("a"), node("b"), node("c")];
+  const edges = [edge("e1", "a", "b"), edge("e2", "b", "c"), edge("e3", "c", "a")];
+  const reach = downstreamReach(nodes, edges);
+  expect(reach["a"]).toBe(2); // b, c — not a itself
 });

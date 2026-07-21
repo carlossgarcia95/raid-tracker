@@ -201,3 +201,34 @@ export function computeCascade(
 
   return { nodeStates, edgeStates, cycles };
 }
+
+// Blast radius: for each node, the count of DISTINCT downstream deliverables
+// reachable via BLOCKING edges. Non-blocking edges don't propagate a hard slip,
+// so they don't count. Iterative DFS with a visited set — terminates on cycles;
+// the start node is never counted as its own downstream.
+export function downstreamReach(
+  nodes: AnalysisNode[],
+  edges: AnalysisEdge[],
+): Record<string, number> {
+  const adj = new Map<string, string[]>();
+  for (const n of nodes) adj.set(n.id, []);
+  for (const e of edges) {
+    if (!e.isBlocking) continue;
+    if (!adj.has(e.source)) adj.set(e.source, []);
+    adj.get(e.source)!.push(e.target);
+  }
+
+  const result: Record<string, number> = {};
+  for (const n of nodes) {
+    const seen = new Set<string>();
+    const stack = [...(adj.get(n.id) ?? [])];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      if (cur === n.id || seen.has(cur)) continue;
+      seen.add(cur);
+      for (const next of adj.get(cur) ?? []) stack.push(next);
+    }
+    result[n.id] = seen.size;
+  }
+  return result;
+}

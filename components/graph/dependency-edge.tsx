@@ -7,12 +7,9 @@ import {
 } from "@xyflow/react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { RAG_STROKE } from "@/lib/rag";
 
-export const RAG_STROKE: Record<"green" | "amber" | "red", string> = {
-  green: "#10b981",
-  amber: "#f59e0b",
-  red: "#ef4444",
-};
+export { RAG_STROKE };
 
 export type DependencyEdgeData = {
   rag: "green" | "amber" | "red";

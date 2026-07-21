@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/sidebar";
 
 const NAV = [
+  { href: "/dashboard", label: "Dashboard" },
   { href: "/graph", label: "Graph" },
   { href: "/deliverables", label: "Deliverables" },
   { href: "/dependencies", label: "Dependencies" },
