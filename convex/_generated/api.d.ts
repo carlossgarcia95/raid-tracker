@@ -9,13 +9,16 @@
  */
 
 import type * as assumptions from "../assumptions.js";
+import type * as crons from "../crons.js";
 import type * as dashboard from "../dashboard.js";
 import type * as deliverables from "../deliverables.js";
 import type * as dependencies from "../dependencies.js";
+import type * as digests from "../digests.js";
 import type * as graph from "../graph.js";
 import type * as issues from "../issues.js";
 import type * as model_deliverables from "../model/deliverables.js";
 import type * as model_derived from "../model/derived.js";
+import type * as model_digest from "../model/digest.js";
 import type * as model_graphAnalysis from "../model/graphAnalysis.js";
 import type * as model_graphData from "../model/graphData.js";
 import type * as model_programs from "../model/programs.js";
@@ -33,13 +36,16 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   assumptions: typeof assumptions;
+  crons: typeof crons;
   dashboard: typeof dashboard;
   deliverables: typeof deliverables;
   dependencies: typeof dependencies;
+  digests: typeof digests;
   graph: typeof graph;
   issues: typeof issues;
   "model/deliverables": typeof model_deliverables;
   "model/derived": typeof model_derived;
+  "model/digest": typeof model_digest;
   "model/graphAnalysis": typeof model_graphAnalysis;
   "model/graphData": typeof model_graphData;
   "model/programs": typeof model_programs;

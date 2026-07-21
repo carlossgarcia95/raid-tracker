@@ -3,6 +3,9 @@
 // file — runDigest (in the same file) does the DB read/write.
 import type { Doc, Id } from "../_generated/dataModel";
 import { slackDays } from "./derived";
+import type { MutationCtx } from "../_generated/server";
+import { loadActiveProgramGraph, toAnalysisGraph } from "./graphData";
+import { downstreamReach } from "./graphAnalysis";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -162,4 +165,51 @@ export function composeDigest(
     improvedCount: better.length,
     totalChanges: classified.length,
   };
+}
+
+// Orchestration on a MutationCtx: read the last 7 days of statusChanges, load the
+// current graph for name/impact enrichment, compose, and UPSERT the week's row.
+export async function runDigest(ctx: MutationCtx, now: number): Promise<Id<"digests">> {
+  const cutoff = now - WEEK_MS;
+  const changes = await ctx.db
+    .query("statusChanges")
+    .withIndex("by_creation_time", (q) => q.gte("_creationTime", cutoff))
+    .collect();
+
+  const graph = await loadActiveProgramGraph(ctx);
+  let gctx: DigestContext;
+  if (graph) {
+    const analysis = toAnalysisGraph(graph.deliverableById, graph.edges);
+    gctx = {
+      deliverableById: graph.deliverableById,
+      teamById: graph.teamById,
+      edgeById: new Map(graph.edges.map((e) => [e._id, e])),
+      reach: downstreamReach(analysis.analysisNodes, analysis.analysisEdges),
+    };
+  } else {
+    gctx = { deliverableById: new Map(), teamById: new Map(), edgeById: new Map(), reach: {} };
+  }
+
+  const result = composeDigest(changes, gctx, now);
+
+  const fields = {
+    weekKey: result.weekKey,
+    periodStart: result.periodStart,
+    periodEnd: result.periodEnd,
+    markdown: result.markdown,
+    worsenedCount: result.worsenedCount,
+    improvedCount: result.improvedCount,
+    totalChanges: result.totalChanges,
+  };
+
+  const existing = await ctx.db
+    .query("digests")
+    .withIndex("by_week", (q) => q.eq("weekKey", result.weekKey))
+    .unique();
+
+  if (existing) {
+    await ctx.db.patch(existing._id, fields);
+    return existing._id;
+  }
+  return await ctx.db.insert("digests", fields);
 }
