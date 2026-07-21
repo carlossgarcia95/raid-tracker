@@ -178,4 +178,17 @@ export default defineSchema({
     oldValue: v.optional(v.string()),
     newValue: v.optional(v.string()),
   }).index("by_entity", ["entityType", "entityId"]),
+
+  // Generated weekly digests. One row per ISO-week (keyed by the UTC Monday),
+  // upserted by runDigest. `markdown` is the artifact; the counts are headline
+  // stats so the UI need not re-parse the body.
+  digests: defineTable({
+    weekKey: v.string(), // "2026-07-20" — UTC Monday of the week; dedup + label
+    periodStart: v.number(),
+    periodEnd: v.number(),
+    markdown: v.string(),
+    worsenedCount: v.number(),
+    improvedCount: v.number(),
+    totalChanges: v.number(),
+  }).index("by_week", ["weekKey"]),
 });

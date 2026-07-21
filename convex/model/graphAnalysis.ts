@@ -202,14 +202,14 @@ export function computeCascade(
   return { nodeStates, edgeStates, cycles };
 }
 
-// Blast radius: for each node, the count of DISTINCT downstream deliverables
-// reachable via BLOCKING edges. Non-blocking edges don't propagate a hard slip,
-// so they don't count. Iterative DFS with a visited set — terminates on cycles;
-// the start node is never counted as its own downstream.
-export function downstreamReach(
+// Blast radius as SETS: for each node, the DISTINCT downstream deliverable ids
+// reachable via BLOCKING edges. Non-blocking edges don't propagate a hard slip.
+// Iterative DFS with a visited set — terminates on cycles; the start node is
+// never included in its own downstream set.
+export function downstreamReachSets(
   nodes: AnalysisNode[],
   edges: AnalysisEdge[],
-): Record<string, number> {
+): Record<string, string[]> {
   const adj = new Map<string, string[]>();
   for (const n of nodes) adj.set(n.id, []);
   for (const e of edges) {
@@ -218,7 +218,7 @@ export function downstreamReach(
     adj.get(e.source)!.push(e.target);
   }
 
-  const result: Record<string, number> = {};
+  const result: Record<string, string[]> = {};
   for (const n of nodes) {
     const seen = new Set<string>();
     const stack = [...(adj.get(n.id) ?? [])];
@@ -228,7 +228,19 @@ export function downstreamReach(
       seen.add(cur);
       for (const next of adj.get(cur) ?? []) stack.push(next);
     }
-    result[n.id] = seen.size;
+    result[n.id] = [...seen];
   }
+  return result;
+}
+
+// Count form: distinct downstream deliverables per node. Derived from the sets
+// so the traversal lives in exactly one place.
+export function downstreamReach(
+  nodes: AnalysisNode[],
+  edges: AnalysisEdge[],
+): Record<string, number> {
+  const sets = downstreamReachSets(nodes, edges);
+  const result: Record<string, number> = {};
+  for (const id in sets) result[id] = sets[id].length;
   return result;
 }
