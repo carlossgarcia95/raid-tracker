@@ -5,7 +5,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { slackDays } from "./derived";
 import type { MutationCtx } from "../_generated/server";
 import { loadActiveProgramGraph, toAnalysisGraph } from "./graphData";
-import { downstreamReach } from "./graphAnalysis";
+import { downstreamReachSets } from "./graphAnalysis";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -23,6 +23,7 @@ export type DigestContext = {
   teamById: Map<Id<"teams">, Doc<"teams">>;
   edgeById: Map<Id<"dependencies">, Doc<"dependencies">>;
   reach: Record<string, number>; // downstreamReach() by deliverable id
+  reachTeams: Record<string, number>; // distinct downstream owning-teams by deliverable id
 };
 
 export type DigestResult = {
@@ -74,6 +75,8 @@ function classify(c: Doc<"statusChanges">, g: DigestContext): Classified {
     let line = `**${title}** moved \`${c.oldValue} → ${c.newValue}\``;
     if (dir === "worse" && reach > 0) {
       line += ` — blocks **${reach}** downstream deliverable${reach === 1 ? "" : "s"}`;
+      const teams = g.reachTeams[c.entityId] ?? 0;
+      if (teams > 0) line += ` across ${teams} team${teams === 1 ? "" : "s"}`;
     }
     return { direction: dir, line, team: teamName };
   }
@@ -89,7 +92,13 @@ function classify(c: Doc<"statusChanges">, g: DigestContext): Classified {
     let line = `**${provTitle} → ${consTitle}** dependency went \`${c.oldValue} → ${c.newValue}\``;
     if (e) {
       const s = slackDays(e.neededByDate, e.committedDate);
-      if (s !== null) line += ` — ${s} day${Math.abs(s) === 1 ? "" : "s"} slack`;
+      if (s !== null) {
+        if (dir === "worse" && s < 0) {
+          line += ` — ${Math.abs(s)} day${Math.abs(s) === 1 ? "" : "s"} slack lost`;
+        } else {
+          line += ` — ${s} day${Math.abs(s) === 1 ? "" : "s"} slack`;
+        }
+      }
     }
     return { direction: dir, line, team: teamName };
   }
@@ -180,14 +189,33 @@ export async function runDigest(ctx: MutationCtx, now: number): Promise<Id<"dige
   let gctx: DigestContext;
   if (graph) {
     const analysis = toAnalysisGraph(graph.deliverableById, graph.edges);
+    const sets = downstreamReachSets(analysis.analysisNodes, analysis.analysisEdges);
+    const reach: Record<string, number> = {};
+    const reachTeams: Record<string, number> = {};
+    for (const id in sets) {
+      reach[id] = sets[id].length;
+      const teams = new Set<string>();
+      for (const did of sets[id]) {
+        const d = graph.deliverableById.get(did as Id<"deliverables">);
+        if (d) teams.add(d.owningTeamId);
+      }
+      reachTeams[id] = teams.size;
+    }
     gctx = {
       deliverableById: graph.deliverableById,
       teamById: graph.teamById,
       edgeById: new Map(graph.edges.map((e) => [e._id, e])),
-      reach: downstreamReach(analysis.analysisNodes, analysis.analysisEdges),
+      reach,
+      reachTeams,
     };
   } else {
-    gctx = { deliverableById: new Map(), teamById: new Map(), edgeById: new Map(), reach: {} };
+    gctx = {
+      deliverableById: new Map(),
+      teamById: new Map(),
+      edgeById: new Map(),
+      reach: {},
+      reachTeams: {},
+    };
   }
 
   const result = composeDigest(changes, gctx, now);

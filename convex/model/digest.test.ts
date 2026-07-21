@@ -37,6 +37,7 @@ function ctx(over: Partial<DigestContext> = {}): DigestContext {
     teamById: new Map(),
     edgeById: new Map(),
     reach: {},
+    reachTeams: {},
     ...over,
   };
 }
@@ -74,6 +75,7 @@ describe("composeDigest", () => {
       deliverableById: new Map([["d1" as Id<"deliverables">, deliv("d1", "Checkout API", "t1")]]),
       teamById: new Map([["t1" as Id<"teams">, team("t1", "Payments")]]),
       reach: { d1: 2 },
+      reachTeams: { d1: 2 },
     });
     const r = composeDigest([change("deliverable", "d1", "status", "in_progress", "blocked")], g, NOW);
     expect(r.worsenedCount).toBe(1);
@@ -81,7 +83,18 @@ describe("composeDigest", () => {
     expect(r.markdown).toContain("### Payments");
     expect(r.markdown).toContain("Checkout API");
     expect(r.markdown).toContain("`in_progress → blocked`");
-    expect(r.markdown).toContain("blocks **2** downstream deliverables");
+    expect(r.markdown).toContain("blocks **2** downstream deliverables across 2 teams");
+  });
+
+  test("a worsening deliverable with singular reach/teams uses singular wording", () => {
+    const g = ctx({
+      deliverableById: new Map([["d1" as Id<"deliverables">, deliv("d1", "Checkout API", "t1")]]),
+      teamById: new Map([["t1" as Id<"teams">, team("t1", "Payments")]]),
+      reach: { d1: 1 },
+      reachTeams: { d1: 1 },
+    });
+    const r = composeDigest([change("deliverable", "d1", "status", "in_progress", "blocked")], g, NOW);
+    expect(r.markdown).toContain("blocks **1** downstream deliverable across 1 team");
   });
 
   test("a dependency going red is worsening and shows provider→consumer plus slack", () => {
@@ -101,7 +114,7 @@ describe("composeDigest", () => {
     expect(r.worsenedCount).toBe(1);
     expect(r.markdown).toContain("Auth Service → Checkout API");
     expect(r.markdown).toContain("`amber → red`");
-    expect(r.markdown).toContain("-2 days slack"); // neededBy − committed = 20 − 22
+    expect(r.markdown).toContain("2 days slack lost"); // neededBy − committed = 20 − 22, amber→red is worsening
     expect(r.markdown).toContain("### Payments"); // grouped under the consumer's team
   });
 
@@ -125,6 +138,7 @@ describe("composeDigest", () => {
       ]),
       teamById: new Map([["t1" as Id<"teams">, team("t1", "Core")]]),
       reach: { d1: 1 },
+      reachTeams: { d1: 1 },
     });
     const r = composeDigest(
       [

@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { expect, test } from "vitest";
 import { detectCycles, type AnalysisNode, type AnalysisEdge } from "./graphAnalysis";
-import { computeCascade, downstreamReach } from "./graphAnalysis";
+import { computeCascade, downstreamReach, downstreamReachSets } from "./graphAnalysis";
 
 const node = (id: string, over: Partial<AnalysisNode> = {}): AnalysisNode => ({
   id,
@@ -152,4 +152,17 @@ test("downstreamReach terminates on a cycle and excludes self", () => {
   const edges = [edge("e1", "a", "b"), edge("e2", "b", "c"), edge("e3", "c", "a")];
   const reach = downstreamReach(nodes, edges);
   expect(reach["a"]).toBe(2); // b, c — not a itself
+});
+
+test("downstreamReachSets returns the distinct downstream id sets over blocking edges", () => {
+  const nodes = [node("a"), node("b"), node("c")];
+  const edges = [
+    edge("e1", "a", "b"),
+    edge("e2", "b", "c"),
+    edge("e3", "b", "d", { isBlocking: false }), // non-blocking: excluded from the set
+  ];
+  const sets = downstreamReachSets(nodes, edges);
+  expect([...sets["a"]].sort()).toEqual(["b", "c"]);
+  expect([...sets["b"]].sort()).toEqual(["c"]);
+  expect([...sets["c"]].sort()).toEqual([]);
 });
