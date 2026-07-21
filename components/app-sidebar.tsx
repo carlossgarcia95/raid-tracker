@@ -9,6 +9,7 @@ import {
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/digest", label: "Digest" },
   { href: "/graph", label: "Graph" },
   { href: "/deliverables", label: "Deliverables" },
   { href: "/dependencies", label: "Dependencies" },
