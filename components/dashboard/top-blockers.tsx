@@ -1,7 +1,7 @@
 import { type FunctionReturnType } from "convex/server";
 import { type api } from "@/convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RAG_DOT } from "@/lib/rag";
+import { RAG_DOT, RAG_LABEL } from "@/lib/rag";
 import { cn } from "@/lib/utils";
 
 type Dashboard = FunctionReturnType<typeof api.dashboard.get>;
@@ -21,7 +21,11 @@ export function TopBlockers({ blockers }: { blockers: Dashboard["topBlockers"] }
               <li key={b.deliverableId} className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 font-medium">
-                    <span className={cn("size-2 rounded-full", RAG_DOT[b.effectiveRag])} />
+                    <span
+                      className={cn("size-2 rounded-full", RAG_DOT[b.effectiveRag])}
+                      title={RAG_LABEL[b.effectiveRag]}
+                    />
+                    <span className="sr-only">{RAG_LABEL[b.effectiveRag]}</span>
                     {b.title}
                   </div>
                   <div className="text-xs text-muted-foreground">
