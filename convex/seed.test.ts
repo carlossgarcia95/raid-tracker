@@ -2,7 +2,7 @@
 import { convexTest, TestConvex } from "convex-test";
 import { expect, test } from "vitest";
 import schema from "./schema";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -59,4 +59,23 @@ test("seed contains the planted cycle", async () => {
   expect(await edgeExists(t, "Data Pipeline", "Analytics Dashboard")).toBe(true);
   expect(await edgeExists(t, "Analytics Dashboard", "Reporting Service")).toBe(true);
   expect(await edgeExists(t, "Reporting Service", "Data Pipeline")).toBe(true);
+});
+
+test("seed plants recent status history for the digest", async () => {
+  const t = convexTest(schema, modules);
+  await t.mutation(internal.seed.run, {});
+  const changes = await t.run(async (ctx) => ctx.db.query("statusChanges").collect());
+  expect(changes.length).toBeGreaterThanOrEqual(3);
+  expect(changes.some((c) => c.newValue === "blocked")).toBe(true);
+  expect(changes.some((c) => c.entityType === "dependency" && c.newValue === "red")).toBe(true);
+});
+
+test("re-seeding clears prior digests", async () => {
+  const t = convexTest(schema, modules);
+  await t.mutation(internal.seed.run, {});
+  await t.mutation(api.digests.generateNow, {});
+  expect((await t.query(api.digests.list, {})).length).toBe(1);
+
+  await t.mutation(internal.seed.run, {}); // reset must wipe digests
+  expect((await t.query(api.digests.list, {})).length).toBe(0);
 });

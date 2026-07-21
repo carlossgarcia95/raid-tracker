@@ -6,7 +6,7 @@ const DAY = 24 * 60 * 60 * 1000;
 // Clear every app table. Deliverables go through the cascade helper so their
 // dependency edges are removed in the same transaction (no orphans).
 async function clearAll(ctx: MutationCtx) {
-  for (const table of ["risks", "assumptions", "issues", "statusChanges"] as const) {
+  for (const table of ["risks", "assumptions", "issues", "statusChanges", "digests"] as const) {
     for (const row of await ctx.db.query(table).collect()) await ctx.db.delete(row._id);
   }
   for (const d of await ctx.db.query("deliverables").collect()) {
@@ -72,7 +72,7 @@ export const run = internalMutation({
 
     // Cascade chain (all blocking).
     await dep(authService, checkoutApi, "amber", true, 20, 22, "Checkout needs auth tokens"); // negative slack
-    await dep(checkoutApi, inAppPurchase, "red", true, 30, 34, "IAP needs the checkout API"); // negative slack
+    const checkoutIapDep = await dep(checkoutApi, inAppPurchase, "red", true, 30, 34, "IAP needs the checkout API"); // negative slack
     await dep(inAppPurchase, appStoreRelease, "green", true, 50, 48, "Release blocked on IAP flow");
     // Supporting realistic edges.
     await dep(authService, apiGateway, "green", true, 12, 9, "Gateway fronts auth");
@@ -94,6 +94,12 @@ export const run = internalMutation({
     await ctx.db.insert("issues", { programId, owningTeamId: teams.payments, title: "Checkout API blocked on auth", description: "Cannot integrate until Auth Service ships tokens.", severity: "high", status: "open", raisedDate: now - 6 * DAY });
     await ctx.db.insert("issues", { programId, owningTeamId: teams.data, title: "Circular dependency detected", description: "Pipeline and Reporting reference each other.", severity: "critical", status: "in_progress", raisedDate: now - 3 * DAY });
     await ctx.db.insert("issues", { programId, owningTeamId: teams.platform, title: "Staging auth flaky", description: "Intermittent 500s from auth in staging.", severity: "medium", status: "resolved", resolution: "Restarted the token cache.", raisedDate: now - 10 * DAY, resolvedDate: now - 8 * DAY });
+
+    // Planted status history so the weekly digest has content on a fresh seed.
+    // _creationTime is assigned now (seed time), so these fall in the rolling 7-day window.
+    await ctx.db.insert("statusChanges", { entityType: "deliverable", entityId: checkoutApi, field: "status", oldValue: "in_progress", newValue: "blocked" });
+    await ctx.db.insert("statusChanges", { entityType: "dependency", entityId: checkoutIapDep, field: "rag", oldValue: "amber", newValue: "red" });
+    await ctx.db.insert("statusChanges", { entityType: "deliverable", entityId: dataPipeline, field: "status", oldValue: "blocked", newValue: "in_progress" });
 
     return null;
   },
