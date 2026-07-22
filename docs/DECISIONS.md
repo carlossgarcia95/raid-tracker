@@ -111,3 +111,15 @@ Format per entry: **Status** · **Context** · **Decision** · **Consequences**.
 **Decision:** Use React Flow, installed as **`@xyflow/react`** (v12). Note the naming trap: the older `reactflow` package is v11 with different import paths — don't install it.
 
 **Consequences:** Nodes and edges are ordinary React components, so team colors, RAG status, and slack rendering reuse the same Tailwind/shadcn vocabulary as the rest of the UI, and the graph stays reactive to Convex `useQuery` results with no adapter layer. Trade-off: React Flow ships rendering and interaction, not graph theory — it has no built-in layout or cycle detection. That costs us less than it looks like, because ADR-0004 already puts cascade and cycle traversal in our own TypeScript. Automatic layout is the real gap: if hand-positioning stops scaling, add a layout library (dagre or elk) rather than switching renderers. The graph is a client component (`"use client"`), per the reactivity model in ADR-0007.
+
+---
+
+## ADR-0010 — Every dependency is a hard block (removed the soft/blocking distinction)
+
+**Status:** Accepted (supersedes the `isBlocking` split introduced in Phase 3)
+
+**Context:** Dependencies originally carried an `isBlocking` flag: a "hard block" vs. a "soft" dependency. In the cascade this softened risk by one level as it crossed a non-blocking edge (red→amber), the blast-radius count followed only blocking edges, and the graph drew soft edges as dashed lines. In practice the distinction added a second thing every edge had to say and muddied the "where are we at risk" read — and conceptually, if something doesn't gate its consumer, it isn't really a dependency.
+
+**Decision:** Drop `isBlocking` entirely — from the schema, seed, cascade, queries, tests, and UI. Every dependency is a hard block. Risk now propagates at full strength across every edge, blast radius follows all edges, and all non-cycle edges render solid. (Cycle edges keep their own animated red-dashed treatment — that's cycle marking, unrelated to blocking.)
+
+**Consequences:** Simpler model and a louder, more honest risk picture — some effective RAGs and blast-radius counts rise because softening no longer discounts them (e.g. Top Blockers now includes the deliverables that previously only reached downstream via soft edges). The migration was a schema-narrowing: widen `isBlocking` to optional, reseed the dependency rows without it, then remove the field. Cost: we lose the ability to express a purely advisory "FYI" dependency; if that need returns, it should come back as an explicit edge *kind*, not a boolean, and with a defined cascade rule.

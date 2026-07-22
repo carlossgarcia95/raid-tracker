@@ -14,11 +14,11 @@ export { RAG_STROKE };
 export type DependencyEdgeData = {
   rag: "green" | "amber" | "red";
   effectiveRag: "green" | "amber" | "red";
-  isBlocking: boolean;
   slackDays: number | null;
   neededByDate: number;
   committedDate?: number;
   description?: string;
+  inCycle: boolean;
   dimmed: boolean;
 };
 export type DependencyEdgeType = Edge<DependencyEdgeData, "dependency">;
@@ -45,7 +45,9 @@ export function DependencyEdge({
     targetPosition,
   });
   const d = data!;
-  const stroke = RAG_STROKE[d.effectiveRag];
+  // Cycle edges trace the loop: forced red, bolder, with an animated flowing
+  // dash (dasharray + animation live in the .cycle-edge-path CSS class).
+  const stroke = d.inCycle ? RAG_STROKE.red : RAG_STROKE[d.effectiveRag];
 
   return (
     <>
@@ -53,11 +55,12 @@ export function DependencyEdge({
         id={id}
         path={edgePath}
         markerEnd={markerEnd}
+        className={d.inCycle ? "cycle-edge-path" : undefined}
         style={{
           stroke,
-          strokeWidth: 2,
-          // Solid = hard block, dashed = soft dependency.
-          strokeDasharray: d.isBlocking ? undefined : "6 4",
+          strokeWidth: d.inCycle ? 3 : 2,
+          // Every dependency is a hard block → solid line. Cycle edges get their
+          // animated dash from the .cycle-edge-path class.
           opacity: d.dimmed ? 0.15 : 1,
         }}
       />

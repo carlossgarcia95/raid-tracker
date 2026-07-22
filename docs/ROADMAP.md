@@ -57,8 +57,9 @@ Three modeling choices carry the whole "this person has run programs" signal. Le
 - `needed_by_date` — when the consumer needs it
 - `committed_date` — when the provider says it'll be ready
 - `rag` (`green` | `amber` | `red`) — can be manually set *and* auto-derived (see cascade)
-- `is_blocking` (bool) — hard block vs. soft dependency
 - Derived (not stored): `slack_days = needed_by_date − committed_date` (negative = at risk on its own)
+
+  (Note: an earlier `is_blocking` flag was removed — every dependency is a hard block. See ADR-0010.)
 
 **Risk**
 - `id`, `program_id`, `owning_team_id`, `title`, `description`

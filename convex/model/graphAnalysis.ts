@@ -10,13 +10,13 @@ export type AnalysisNode = {
   targetDate?: number;
 };
 
-// source = provider deliverable, target = consumer deliverable.
+// source = provider deliverable, target = consumer deliverable. Every dependency
+// is a hard block — there is no "soft" edge, so risk crosses at full strength.
 export type AnalysisEdge = {
   id: string;
   source: string;
   target: string;
   rag: Severity;
-  isBlocking: boolean;
   slackDays: number | null;
 };
 
@@ -24,8 +24,6 @@ export type Cycle = { deliverableIds: string[]; edgeIds: string[] };
 
 const RANK: Record<Severity, number> = { green: 0, amber: 1, red: 2 };
 const maxSev = (a: Severity, b: Severity): Severity => (RANK[a] >= RANK[b] ? a : b);
-// A non-blocking edge softens the risk that crosses it by one level.
-const soften = (s: Severity): Severity => (s === "red" ? "amber" : "green");
 
 // Standard white/grey/black DFS. A back-edge (to a grey node still on the
 // current path) closes a cycle; we recover its members from the path stack.
@@ -91,7 +89,7 @@ export function detectCycles(
 }
 
 // Helpers exported for computeCascade (Task 2) in the same file.
-export const _sev = { RANK, maxSev, soften };
+export const _sev = { RANK, maxSev };
 
 export type ItemState = { effectiveRag: Severity; reasons: string[] };
 
@@ -108,7 +106,7 @@ export function computeCascade(
   edges: AnalysisEdge[],
   now: number,
 ): CascadeResult {
-  const { RANK, maxSev, soften } = _sev;
+  const { RANK, maxSev } = _sev;
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
   const cycles = detectCycles(nodes, edges);
   const cycleMembers = new Set(cycles.flatMap((c) => c.deliverableIds));
@@ -158,10 +156,8 @@ export function computeCascade(
   // Fixpoint over node severities. Severities only rise and are capped at red,
   // so this terminates even when the graph has cycles.
   const nodeSev = new Map(nodeIntrinsic);
-  const transmitted = (e: AnalysisEdge): Severity => {
-    const carried = maxSev(nodeSev.get(e.source) ?? "green", edgeIntrinsic.get(e.id)!);
-    return e.isBlocking ? carried : soften(carried);
-  };
+  const transmitted = (e: AnalysisEdge): Severity =>
+    maxSev(nodeSev.get(e.source) ?? "green", edgeIntrinsic.get(e.id)!);
   let changed = true;
   while (changed) {
     changed = false;
@@ -193,8 +189,7 @@ export function computeCascade(
   const edgeStates: Record<string, ItemState> = {};
   for (const e of edges) {
     const providerSev = nodeSev.get(e.source) ?? "green";
-    const softenedProvider = e.isBlocking ? providerSev : soften(providerSev);
-    const effectiveRag = maxSev(edgeIntrinsic.get(e.id)!, softenedProvider);
+    const effectiveRag = maxSev(edgeIntrinsic.get(e.id)!, providerSev);
     const reasons = [...(edgeReasons.get(e.id) ?? [])];
     if (RANK[providerSev] > 0) {
       reasons.push(`provider at risk: ${nodeById.get(e.source)?.title ?? e.source}`);
@@ -206,9 +201,9 @@ export function computeCascade(
 }
 
 // Blast radius as SETS: for each node, the DISTINCT downstream deliverable ids
-// reachable via BLOCKING edges. Non-blocking edges don't propagate a hard slip.
-// Iterative DFS with a visited set — terminates on cycles; the start node is
-// never included in its own downstream set.
+// reachable via dependency edges (every dependency is a hard block). Iterative
+// DFS with a visited set — terminates on cycles; the start node is never
+// included in its own downstream set.
 export function downstreamReachSets(
   nodes: AnalysisNode[],
   edges: AnalysisEdge[],
@@ -216,7 +211,6 @@ export function downstreamReachSets(
   const adj = new Map<string, string[]>();
   for (const n of nodes) adj.set(n.id, []);
   for (const e of edges) {
-    if (!e.isBlocking) continue;
     if (!adj.has(e.source)) adj.set(e.source, []);
     adj.get(e.source)!.push(e.target);
   }

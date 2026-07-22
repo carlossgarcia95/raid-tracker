@@ -19,7 +19,6 @@ const edge = (
   source,
   target,
   rag: "green",
-  isBlocking: true,
   slackDays: null,
   ...over,
 });
@@ -70,25 +69,18 @@ test("computeCascade propagates a blocked node red down a blocking chain", () =>
   expect(nodeStates["c"].reasons).toContain("depends on at-risk: b");
 });
 
-test("computeCascade softens risk one level across a non-blocking edge", () => {
-  const nodes = [node("a", { status: "blocked" }), node("b")];
-  const edges = [edge("e1", "a", "b", { isBlocking: false })];
-  const { nodeStates } = computeCascade(nodes, edges, 0);
-  expect(nodeStates["a"].effectiveRag).toBe("red");
-  expect(nodeStates["b"].effectiveRag).toBe("amber");
-});
-
-test("computeCascade takes the max severity when paths converge (diamond)", () => {
-  const nodes = [node("a", { status: "blocked" }), node("b"), node("d"), node("e")];
-  const edges = [
-    edge("e1", "a", "b"), // blocking: b red
-    edge("e2", "a", "d", { isBlocking: false }), // soft: d amber
-    edge("e3", "b", "e"), // blocking: carries red
-    edge("e4", "d", "e", { isBlocking: false }), // soft: carries green
+test("computeCascade takes the max severity when paths converge", () => {
+  // 'a' is blocked (red source); 'x' is overdue (amber source). Both feed 'e',
+  // which must land on the higher of the two.
+  const nodes = [
+    node("a", { status: "blocked" }),
+    node("x", { status: "in_progress", targetDate: 5 }),
+    node("e"),
   ];
-  const { nodeStates } = computeCascade(nodes, edges, 0);
-  expect(nodeStates["d"].effectiveRag).toBe("amber");
-  expect(nodeStates["e"].effectiveRag).toBe("red");
+  const edges = [edge("e1", "a", "e"), edge("e2", "x", "e")];
+  const { nodeStates } = computeCascade(nodes, edges, 10);
+  expect(nodeStates["x"].effectiveRag).toBe("amber"); // overdue
+  expect(nodeStates["e"].effectiveRag).toBe("red"); // max(red from a, amber from x)
 });
 
 test("computeCascade terminates on a cycle and marks members red", () => {
@@ -136,16 +128,6 @@ test("downstreamReach counts distinct downstream nodes over blocking edges", () 
   expect(downstreamReach(nodes, edges)).toEqual({ a: 2, b: 1, c: 0 });
 });
 
-test("downstreamReach ignores non-blocking edges", () => {
-  const nodes = [node("a"), node("b"), node("c")];
-  const edges = [
-    edge("e1", "a", "b", { isBlocking: false }),
-    edge("e2", "b", "c"),
-  ];
-  // a reaches nothing (its only out-edge is soft); b still reaches c.
-  expect(downstreamReach(nodes, edges)).toEqual({ a: 0, b: 1, c: 0 });
-});
-
 test("downstreamReach counts a fan-out target once", () => {
   const nodes = [node("a"), node("b"), node("c"), node("d")];
   const edges = [
@@ -164,15 +146,15 @@ test("downstreamReach terminates on a cycle and excludes self", () => {
   expect(reach["a"]).toBe(2); // b, c — not a itself
 });
 
-test("downstreamReachSets returns the distinct downstream id sets over blocking edges", () => {
-  const nodes = [node("a"), node("b"), node("c")];
+test("downstreamReachSets returns the distinct downstream id sets", () => {
+  const nodes = [node("a"), node("b"), node("c"), node("d")];
   const edges = [
     edge("e1", "a", "b"),
     edge("e2", "b", "c"),
-    edge("e3", "b", "d", { isBlocking: false }), // non-blocking: excluded from the set
+    edge("e3", "b", "d"),
   ];
   const sets = downstreamReachSets(nodes, edges);
-  expect([...sets["a"]].sort()).toEqual(["b", "c"]);
-  expect([...sets["b"]].sort()).toEqual(["c"]);
+  expect([...sets["a"]].sort()).toEqual(["b", "c", "d"]);
+  expect([...sets["b"]].sort()).toEqual(["c", "d"]);
   expect([...sets["c"]].sort()).toEqual([]);
 });

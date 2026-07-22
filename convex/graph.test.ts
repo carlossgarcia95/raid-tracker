@@ -108,7 +108,6 @@ test("graph.get excludes deliverables and edges from a non-active program", asyn
       providerDeliverableId: programADeliverable._id,
       consumerDeliverableId: otherDeliverableId,
       rag: "green",
-      isBlocking: false,
       neededByDate: Date.now(),
     });
 

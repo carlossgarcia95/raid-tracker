@@ -64,7 +64,6 @@ export function toAnalysisGraph(
     source: e.providerDeliverableId,
     target: e.consumerDeliverableId,
     rag: e.rag,
-    isBlocking: e.isBlocking,
     slackDays: slackDays(e.neededByDate, e.committedDate),
   }));
   return { analysisNodes, analysisEdges, renderEdges };

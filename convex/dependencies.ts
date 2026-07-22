@@ -28,7 +28,6 @@ export const list = query({
       neededByDate: e.neededByDate,
       committedDate: e.committedDate,
       rag: e.rag,
-      isBlocking: e.isBlocking,
       slackDays: slackDays(e.neededByDate, e.committedDate),
       providerTitle: title(e.providerDeliverableId),
       providerTeamName: teamName(e.providerDeliverableId),
