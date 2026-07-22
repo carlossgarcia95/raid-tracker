@@ -143,6 +143,9 @@ export function computeCascade(
     if (e.rag === "red") {
       sev = "red";
       reasons.push("manually red");
+    } else if (e.rag === "amber") {
+      sev = maxSev(sev, "amber");
+      reasons.push("manually amber");
     }
     if (e.slackDays !== null && e.slackDays < 0) {
       sev = maxSev(sev, "amber");
