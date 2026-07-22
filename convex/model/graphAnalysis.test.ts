@@ -112,6 +112,16 @@ test("computeCascade flags overdue and negative-slack as amber sources", () => {
   expect(edgeStates["e1"].reasons).toContain("negative slack (-3d)");
 });
 
+test("computeCascade respects a manually-set amber edge with a green provider", () => {
+  const nodes = [node("a"), node("b")]; // both in_progress, not overdue
+  const edges = [edge("e1", "a", "b", { rag: "amber" })]; // manual amber, positive/no slack
+  const { edgeStates, nodeStates } = computeCascade(nodes, edges, 0);
+  expect(edgeStates["e1"].effectiveRag).toBe("amber");
+  expect(edgeStates["e1"].reasons).toContain("manually amber");
+  // and the amber baseline transmits (softened by nothing — it's a blocking edge)
+  expect(nodeStates["b"].effectiveRag).toBe("amber");
+});
+
 test("computeCascade shows a green edge as red when its provider is blocked", () => {
   const nodes = [node("a", { status: "blocked" }), node("b")];
   const edges = [edge("e1", "a", "b")]; // rag green, blocking
