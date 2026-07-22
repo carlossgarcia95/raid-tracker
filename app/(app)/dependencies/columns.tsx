@@ -3,7 +3,6 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { api } from "@/convex/_generated/api";
 import { FunctionReturnType } from "convex/server";
-import { Badge } from "@/components/ui/badge";
 
 type Dependency = FunctionReturnType<typeof api.dependencies.list>[number];
 
@@ -30,12 +29,6 @@ export const columns: ColumnDef<Dependency, unknown>[] = [
         {row.original.consumerTitle}
       </span>
     ),
-  },
-  {
-    accessorKey: "isBlocking",
-    header: "Type",
-    cell: ({ row }) =>
-      row.original.isBlocking ? <Badge variant="destructive">blocking</Badge> : <Badge variant="secondary">soft</Badge>,
   },
   { accessorKey: "neededByDate", header: "Needed by", cell: ({ row }) => fmt(row.original.neededByDate) },
   { accessorKey: "committedDate", header: "Committed", cell: ({ row }) => fmt(row.original.committedDate) },

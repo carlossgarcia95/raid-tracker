@@ -22,16 +22,16 @@ test("deleting a deliverable removes its inbound and outbound edges", async () =
     // upstream -> target (target is consumer), target -> downstream (target is provider)
     await ctx.db.insert("dependencies", {
       providerDeliverableId: upstream, consumerDeliverableId: target,
-      neededByDate: 0, rag: "green", isBlocking: true,
+      neededByDate: 0, rag: "green",
     });
     await ctx.db.insert("dependencies", {
       providerDeliverableId: target, consumerDeliverableId: downstream,
-      neededByDate: 0, rag: "green", isBlocking: true,
+      neededByDate: 0, rag: "green",
     });
     // unrelated edge that does not touch `target` at all — must survive the cascade
     const unrelated = await ctx.db.insert("dependencies", {
       providerDeliverableId: upstream, consumerDeliverableId: downstream,
-      neededByDate: 0, rag: "green", isBlocking: true,
+      neededByDate: 0, rag: "green",
     });
     return { target, unrelated };
   });
@@ -63,7 +63,7 @@ test("deleting a deliverable with a self-referencing edge does not throw and rem
     // BOTH the by_provider and by_consumer queries — must be deduped before delete.
     await ctx.db.insert("dependencies", {
       providerDeliverableId: target, consumerDeliverableId: target,
-      neededByDate: 0, rag: "green", isBlocking: true,
+      neededByDate: 0, rag: "green",
     });
     return { target };
   });

@@ -128,3 +128,20 @@
     @apply font-sans;
   }
 }
+
+/* Dependency-graph cycle edges: a marching-ants flow so the loop reads as a
+   loop. Dash sum (8 + 6) matches the offset so the animation tiles seamlessly. */
+@keyframes cycle-dash {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+.cycle-edge-path {
+  stroke-dasharray: 8 6;
+  animation: cycle-dash 0.7s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cycle-edge-path {
+    animation: none;
+  }
+}

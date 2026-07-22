@@ -49,7 +49,6 @@ export const get = query({
         rag: e.rag,
         effectiveRag: state?.effectiveRag ?? e.rag,
         reasons: state?.reasons ?? [],
-        isBlocking: e.isBlocking,
         neededByDate: e.neededByDate,
         committedDate: e.committedDate,
         slackDays: slackDays(e.neededByDate, e.committedDate),

@@ -21,13 +21,15 @@ test("dashboard.get rolls up the seeded program", async () => {
   expect(d.dependencyTotals.total).toBe(8);
   expect(d.atRisk.cycles).toBe(1);
 
-  // Top blockers: at-risk deliverables with downstream blocking reach > 0,
-  // ranked by count desc then title asc.
+  // Top blockers: at-risk deliverables with downstream reach > 0, ranked by
+  // count desc then title asc. Every dependency is a hard block, so reach now
+  // follows all edges (the old soft edges included).
   expect(d.topBlockers.map((b) => b.title)).toEqual([
-    "Checkout API",     // reaches In-App Purchase, App Store Release (2)
-    "Reporting Service", // reaches Data Pipeline, Analytics Dashboard (2)
-    "Data Pipeline",     // reaches Analytics Dashboard (1)
-    "In-App Purchase",   // reaches App Store Release (1)
+    "Analytics Dashboard", // reaches Reporting Service, Data Pipeline (2)
+    "Checkout API",        // reaches In-App Purchase, App Store Release (2)
+    "Data Pipeline",       // reaches Analytics Dashboard, Reporting Service (2)
+    "Reporting Service",   // reaches Data Pipeline, Analytics Dashboard (2)
+    "In-App Purchase",     // reaches App Store Release (1)
   ]);
   expect(d.topBlockers[0].downstreamCount).toBe(2);
 

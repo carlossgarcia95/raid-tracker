@@ -116,7 +116,8 @@ export default defineSchema({
     neededByDate: v.number(), // when the consumer needs it
     committedDate: v.optional(v.number()), // when the provider says it'll be ready
     rag: rag, // manual baseline; cascade may push this to red
-    isBlocking: v.boolean(), // hard block vs. soft dependency
+    // Every dependency is a hard block (no "soft" edges) — so there is no
+    // blocking flag to store; the edge existing IS the block.
     // slackDays = neededByDate - committedDate is DERIVED in code, not stored.
   })
     .index("by_provider", ["providerDeliverableId"])

@@ -50,8 +50,8 @@ function GraphInner({ data }: { data: GraphData }) {
     () => new Map(data.nodes.map((n) => [n.id, n.title] as const)),
     [data.nodes],
   );
-  const cycleMembers = useMemo(
-    () => new Set(data.cycles.flatMap((c) => c.deliverableIds)),
+  const cycleEdgeIds = useMemo(
+    () => new Set(data.cycles.flatMap((c) => c.edgeIds)),
     [data.cycles],
   );
 
@@ -135,13 +135,12 @@ function GraphInner({ data }: { data: GraphData }) {
           teamName: n.teamName,
           teamColor: n.teamColor,
           effectiveRag: n.effectiveRag,
-          inCycle: cycleMembers.has(n.id),
           dimmed:
             selectedId !== null && n.id !== selectedId && !neighborIds.has(n.id),
         },
       })),
     );
-  }, [data.nodes, positions, setNodes, selectedId, neighborIds, cycleMembers]);
+  }, [data.nodes, positions, setNodes, selectedId, neighborIds]);
 
   useEffect(() => {
     setEdges(
@@ -150,15 +149,18 @@ function GraphInner({ data }: { data: GraphData }) {
         source: e.source,
         target: e.target,
         type: "dependency",
-        markerEnd: { type: MarkerType.ArrowClosed, color: RAG_STROKE[e.effectiveRag] },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: cycleEdgeIds.has(e.id) ? RAG_STROKE.red : RAG_STROKE[e.effectiveRag],
+        },
         data: {
           rag: e.rag,
           effectiveRag: e.effectiveRag,
-          isBlocking: e.isBlocking,
           slackDays: e.slackDays,
           neededByDate: e.neededByDate,
           committedDate: e.committedDate,
           description: e.description,
+          inCycle: cycleEdgeIds.has(e.id),
           dimmed:
             selectedId !== null &&
             e.source !== selectedId &&
@@ -166,7 +168,7 @@ function GraphInner({ data }: { data: GraphData }) {
         },
       })),
     );
-  }, [data.edges, setEdges, selectedId]);
+  }, [data.edges, setEdges, selectedId, cycleEdgeIds]);
 
   const focusCycle = useCallback(
     (ids: string[]) => {

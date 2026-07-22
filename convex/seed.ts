@@ -59,28 +59,28 @@ export const run = internalMutation({
 
     const dep = async (
       provider: typeof authService, consumer: typeof authService,
-      rag: "green" | "amber" | "red", isBlocking: boolean,
+      rag: "green" | "amber" | "red",
       neededOffsetDays: number, committedOffsetDays: number | undefined,
       description: string,
     ) =>
       ctx.db.insert("dependencies", {
         providerDeliverableId: provider, consumerDeliverableId: consumer,
-        rag, isBlocking, description,
+        rag, description,
         neededByDate: now + neededOffsetDays * DAY,
         committedDate: committedOffsetDays === undefined ? undefined : now + committedOffsetDays * DAY,
       });
 
-    // Cascade chain (all blocking).
-    await dep(authService, checkoutApi, "amber", true, 20, 22, "Checkout needs auth tokens"); // negative slack
-    const checkoutIapDep = await dep(checkoutApi, inAppPurchase, "red", true, 30, 34, "IAP needs the checkout API"); // negative slack
-    await dep(inAppPurchase, appStoreRelease, "green", true, 50, 48, "Release blocked on IAP flow");
+    // Cascade chain. Every dependency is a hard block.
+    await dep(authService, checkoutApi, "amber", 20, 22, "Checkout needs auth tokens"); // negative slack
+    const checkoutIapDep = await dep(checkoutApi, inAppPurchase, "red", 30, 34, "IAP needs the checkout API"); // negative slack
+    await dep(inAppPurchase, appStoreRelease, "green", 50, 48, "Release blocked on IAP flow");
     // Supporting realistic edges.
-    await dep(authService, apiGateway, "green", true, 12, 9, "Gateway fronts auth");
-    await dep(apiGateway, checkoutApi, "amber", false, 24, 24, "Checkout routes through gateway");
+    await dep(authService, apiGateway, "green", 12, 9, "Gateway fronts auth");
+    await dep(apiGateway, checkoutApi, "amber", 24, 24, "Checkout routes through gateway");
     // Planted cycle.
-    await dep(dataPipeline, analyticsDashboard, "green", true, 22, 20, "Dashboard consumes pipeline output");
-    await dep(analyticsDashboard, reportingService, "amber", false, 45, undefined, "Reports read from dashboard");
-    await dep(reportingService, dataPipeline, "red", true, 18, 24, "Pipeline backfill needs report schema"); // cycle-closing, negative slack
+    await dep(dataPipeline, analyticsDashboard, "green", 22, 20, "Dashboard consumes pipeline output");
+    await dep(analyticsDashboard, reportingService, "amber", 45, undefined, "Reports read from dashboard");
+    await dep(reportingService, dataPipeline, "red", 18, 24, "Pipeline backfill needs report schema"); // cycle-closing, negative slack
 
     await ctx.db.insert("risks", { programId, owningTeamId: teams.payments, title: "PCI review may slip", description: "External auditor availability uncertain.", probability: 4, impact: 5, mitigation: "Booked provisional audit slot", ownerName: "Marco B.", status: "open" });
     await ctx.db.insert("risks", { programId, owningTeamId: teams.platform, title: "Auth vendor rate limits", description: "Load test hit vendor throttling.", probability: 3, impact: 4, mitigation: "Negotiating higher tier", ownerName: "Priya N.", status: "mitigating" });
